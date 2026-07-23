@@ -1,0 +1,8 @@
+[
+  { "name": "Emergency (police/fire/ambulance)", "number": "112", "notes": "Life-threatening emergencies only" },
+  { "name": "Non-urgent police", "number": "0900-8844", "notes": "" },
+  { "name": "Huisarts (GP)", "number": "", "notes": "Fill in once registered with a local practice" },
+  { "name": "Apotheek (pharmacy)", "number": "", "notes": "" },
+  { "name": "Gemeente (municipality)", "number": "", "notes": "" },
+  { "name": "IND (immigration)", "number": "088-0430430", "notes": "" }
+]
