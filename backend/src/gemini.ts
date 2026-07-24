@@ -4,16 +4,20 @@ import { config } from "./config.js";
 const ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
 const MODEL = config.geminiModel;
 
-// ponytail: one retry after a fixed delay covers Gemini's transient 503s; add backoff/jitter if failures persist
+// ponytail: fixed backoff schedule covers Gemini's transient 503 overload spikes; add jitter if this still isn't enough
+const RETRY_DELAYS_MS = [2000, 5000, 10000];
+
 async function generateWithRetry(params: Parameters<typeof ai.models.generateContent>[0]) {
-  try {
-    return await ai.models.generateContent(params);
-  } catch (err) {
-    const status = (err as { status?: number }).status;
-    if (status !== 503) throw err;
-    await new Promise((r) => setTimeout(r, 2000));
-    return ai.models.generateContent(params);
+  for (const delay of RETRY_DELAYS_MS) {
+    try {
+      return await ai.models.generateContent(params);
+    } catch (err) {
+      const status = (err as { status?: number }).status;
+      if (status !== 503) throw err;
+      await new Promise((r) => setTimeout(r, delay));
+    }
   }
+  return ai.models.generateContent(params);
 }
 
 const TRANSLATE_INSTRUCTIONS =
