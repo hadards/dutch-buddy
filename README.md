@@ -44,4 +44,4 @@ Edit `backend/src/data/contacts.json` and `backend/src/data/areas.json` directly
 
 ## Deploying
 
-For the web app and Telegram bot to work when your machine is off, deploy `backend` to a host that stays on (Render, Fly.io, Railway free tiers all work) and `web` as a static build (`npm run build` in `web/`) to any static host (Vercel, Netlify, or served by the same backend). Point the web app's `/api` calls at your deployed backend URL.
+The backend is deployed on [Railway](https://railway.app) (free trial, no card required) so the Telegram bot and API stay reachable when your machine is off. `web` deploys separately as a static build (`npm run build` in `web/`) to any static host (Vercel, Netlify, or served by the same backend) — point its `VITE_API_BASE` env var at the deployed backend URL.
