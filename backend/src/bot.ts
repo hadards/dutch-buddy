@@ -1,4 +1,4 @@
-import { Bot } from "grammy";
+import { Bot, Context } from "grammy";
 import { config } from "./config.js";
 import { translateText, translateImage, translateVoice } from "./gemini.js";
 import { formatContacts, formatAreas } from "./data.js";
@@ -27,38 +27,41 @@ export function createBot(): Bot {
     ctx.reply(formatAreas(query || undefined));
   });
 
-  bot.on("message:text", async (ctx) => {
-    if (ctx.message.text.startsWith("/")) return;
-    if (!checkAndIncrement(String(ctx.chat.id))) {
-      await ctx.reply(`Daily limit of ${dailyLimit} translations reached. Try again tomorrow.`);
-      return;
-    }
-    const reply = await translateText(ctx.message.text);
-    await ctx.reply(reply);
-  });
+  function withinDailyLimit(ctx: Context): boolean {
+    if (checkAndIncrement(String(ctx.chat!.id))) return true;
+    ctx.reply(`Daily limit of ${dailyLimit} translations reached. Try again tomorrow.`);
+    return false;
+  }
 
-  bot.on("message:photo", async (ctx) => {
-    if (!checkAndIncrement(String(ctx.chat.id))) {
-      await ctx.reply(`Daily limit of ${dailyLimit} translations reached. Try again tomorrow.`);
-      return;
-    }
-    const photo = ctx.message.photo.at(-1)!;
-    const file = await ctx.api.getFile(photo.file_id);
-    const bytes = await downloadFile(file.file_path!);
-    const reply = await translateImage(bytes, "image/jpeg");
-    await ctx.reply(reply);
-  });
+  bot
+    .on("message:text")
+    .filter((ctx) => !ctx.message.text.startsWith("/"))
+    .filter(withinDailyLimit)
+    .use(async (ctx) => {
+      const reply = await translateText(ctx.message.text);
+      await ctx.reply(reply);
+    });
 
-  bot.on("message:voice", async (ctx) => {
-    if (!checkAndIncrement(String(ctx.chat.id))) {
-      await ctx.reply(`Daily limit of ${dailyLimit} translations reached. Try again tomorrow.`);
-      return;
-    }
-    const file = await ctx.api.getFile(ctx.message.voice.file_id);
-    const bytes = await downloadFile(file.file_path!);
-    const reply = await translateVoice(bytes, "audio/ogg");
-    await ctx.reply(reply);
-  });
+  bot
+    .on("message:photo")
+    .filter(withinDailyLimit)
+    .use(async (ctx) => {
+      const photo = ctx.message.photo.at(-1)!;
+      const file = await ctx.api.getFile(photo.file_id);
+      const bytes = await downloadFile(file.file_path!);
+      const reply = await translateImage(bytes, "image/jpeg");
+      await ctx.reply(reply);
+    });
+
+  bot
+    .on("message:voice")
+    .filter(withinDailyLimit)
+    .use(async (ctx) => {
+      const file = await ctx.api.getFile(ctx.message.voice.file_id);
+      const bytes = await downloadFile(file.file_path!);
+      const reply = await translateVoice(bytes, "audio/ogg");
+      await ctx.reply(reply);
+    });
 
   bot.catch((err) => {
     console.error("Bot handler error:", err.error);

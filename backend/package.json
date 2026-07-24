@@ -7,7 +7,7 @@
     "dev": "tsx watch src/main.ts",
     "build": "tsc",
     "start": "node dist/main.js",
-    "test": "tsx src/gemini.test.ts"
+    "test": "tsx src/app.test.ts"
   },
   "dependencies": {
     "@google/genai": "^0.3.0",

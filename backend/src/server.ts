@@ -2,7 +2,7 @@ import express from "express";
 import cors from "cors";
 import { config } from "./config.js";
 import { translateText, translateImage, translateVoice } from "./gemini.js";
-import { getContacts, getAreas } from "./data.js";
+import { contacts, areas } from "./data.js";
 import { requirePassphrase } from "./auth.js";
 import { checkAndIncrement, dailyLimit } from "./rateLimit.js";
 
@@ -51,11 +51,11 @@ export function createServer() {
   });
 
   app.get("/api/contacts", requirePassphrase, (_req, res) => {
-    res.json(getContacts());
+    res.json(contacts);
   });
 
   app.get("/api/areas", requirePassphrase, (_req, res) => {
-    res.json(getAreas());
+    res.json(areas);
   });
 
   return app;

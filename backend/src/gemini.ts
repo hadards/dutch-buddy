@@ -33,15 +33,15 @@ export async function translateText(text: string): Promise<string> {
   return response.text ?? "(no response)";
 }
 
-export async function translateImage(imageBytes: Buffer, mimeType: string): Promise<string> {
+async function translateMedia(bytes: Buffer, mimeType: string, instruction: string): Promise<string> {
   const response = await generateWithRetry({
     model: MODEL,
     contents: [
       {
         role: "user",
         parts: [
-          { text: `${TRANSLATE_INSTRUCTIONS}\n\nExtract any text visible in this image first, then translate it.` },
-          { inlineData: { mimeType, data: imageBytes.toString("base64") } },
+          { text: `${TRANSLATE_INSTRUCTIONS}\n\n${instruction}` },
+          { inlineData: { mimeType, data: bytes.toString("base64") } },
         ],
       },
     ],
@@ -49,18 +49,10 @@ export async function translateImage(imageBytes: Buffer, mimeType: string): Prom
   return response.text ?? "(no response)";
 }
 
-export async function translateVoice(audioBytes: Buffer, mimeType: string): Promise<string> {
-  const response = await generateWithRetry({
-    model: MODEL,
-    contents: [
-      {
-        role: "user",
-        parts: [
-          { text: `${TRANSLATE_INSTRUCTIONS}\n\nTranscribe this audio first, then translate it.` },
-          { inlineData: { mimeType, data: audioBytes.toString("base64") } },
-        ],
-      },
-    ],
-  });
-  return response.text ?? "(no response)";
+export function translateImage(imageBytes: Buffer, mimeType: string): Promise<string> {
+  return translateMedia(imageBytes, mimeType, "Extract any text visible in this image first, then translate it.");
+}
+
+export function translateVoice(audioBytes: Buffer, mimeType: string): Promise<string> {
+  return translateMedia(audioBytes, mimeType, "Transcribe this audio first, then translate it.");
 }

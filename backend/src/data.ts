@@ -1,13 +1,7 @@
 import contacts from "./data/contacts.json" with { type: "json" };
 import areas from "./data/areas.json" with { type: "json" };
 
-export function getContacts() {
-  return contacts;
-}
-
-export function getAreas() {
-  return areas;
-}
+export { contacts, areas };
 
 export function formatContacts(): string {
   return contacts
