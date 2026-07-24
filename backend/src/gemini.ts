@@ -4,13 +4,25 @@ import { config } from "./config.js";
 const ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
 const MODEL = config.geminiModel;
 
+// ponytail: one retry after a fixed delay covers Gemini's transient 503s; add backoff/jitter if failures persist
+async function generateWithRetry(params: Parameters<typeof ai.models.generateContent>[0]) {
+  try {
+    return await ai.models.generateContent(params);
+  } catch (err) {
+    const status = (err as { status?: number }).status;
+    if (status !== 503) throw err;
+    await new Promise((r) => setTimeout(r, 2000));
+    return ai.models.generateContent(params);
+  }
+}
+
 const TRANSLATE_INSTRUCTIONS =
   "You help a family that just moved to the Netherlands. They speak English and Hebrew, and are learning Dutch. " +
   "Detect the source language. Reply with the translation into the other relevant languages (always include Dutch, English, and Hebrew unless the source is already one of them, in which case translate to the remaining two). " +
   "Keep it short and clearly labeled per language. If the text looks like official/bureaucratic Dutch mail (gemeente, belastingdienst, DigiD, etc.), add a one- or two-sentence plain-language explanation of what it means and whether action is needed.";
 
 export async function translateText(text: string): Promise<string> {
-  const response = await ai.models.generateContent({
+  const response = await generateWithRetry({
     model: MODEL,
     contents: [{ role: "user", parts: [{ text: `${TRANSLATE_INSTRUCTIONS}\n\nText:\n${text}` }] }],
   });
@@ -18,7 +30,7 @@ export async function translateText(text: string): Promise<string> {
 }
 
 export async function translateImage(imageBytes: Buffer, mimeType: string): Promise<string> {
-  const response = await ai.models.generateContent({
+  const response = await generateWithRetry({
     model: MODEL,
     contents: [
       {
@@ -34,7 +46,7 @@ export async function translateImage(imageBytes: Buffer, mimeType: string): Prom
 }
 
 export async function translateVoice(audioBytes: Buffer, mimeType: string): Promise<string> {
-  const response = await ai.models.generateContent({
+  const response = await generateWithRetry({
     model: MODEL,
     contents: [
       {
