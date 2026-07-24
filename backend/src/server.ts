@@ -4,6 +4,15 @@ import { config } from "./config.js";
 import { translateText, translateImage, translateVoice } from "./gemini.js";
 import { getContacts, getAreas } from "./data.js";
 import { requirePassphrase } from "./auth.js";
+import { checkAndIncrement, dailyLimit } from "./rateLimit.js";
+
+function requireRateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
+  if (!checkAndIncrement("web")) {
+    res.status(429).json({ error: `Daily limit of ${dailyLimit} translations reached. Try again tomorrow.` });
+    return;
+  }
+  next();
+}
 
 export function createServer() {
   const app = express();
@@ -14,7 +23,7 @@ export function createServer() {
     res.json({ ok: true });
   });
 
-  app.post("/api/translate/text", requirePassphrase, async (req, res) => {
+  app.post("/api/translate/text", requirePassphrase, requireRateLimit, async (req, res) => {
     const { text } = req.body ?? {};
     if (typeof text !== "string" || !text.trim()) {
       res.status(400).json({ error: "Missing text" });
@@ -23,7 +32,7 @@ export function createServer() {
     res.json({ result: await translateText(text) });
   });
 
-  app.post("/api/translate/image", requirePassphrase, async (req, res) => {
+  app.post("/api/translate/image", requirePassphrase, requireRateLimit, async (req, res) => {
     const { imageBase64, mimeType } = req.body ?? {};
     if (typeof imageBase64 !== "string" || typeof mimeType !== "string") {
       res.status(400).json({ error: "Missing imageBase64 or mimeType" });
@@ -32,7 +41,7 @@ export function createServer() {
     res.json({ result: await translateImage(Buffer.from(imageBase64, "base64"), mimeType) });
   });
 
-  app.post("/api/translate/voice", requirePassphrase, async (req, res) => {
+  app.post("/api/translate/voice", requirePassphrase, requireRateLimit, async (req, res) => {
     const { audioBase64, mimeType } = req.body ?? {};
     if (typeof audioBase64 !== "string" || typeof mimeType !== "string") {
       res.status(400).json({ error: "Missing audioBase64 or mimeType" });

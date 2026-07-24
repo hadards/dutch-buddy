@@ -2,6 +2,7 @@ import { Bot } from "grammy";
 import { config } from "./config.js";
 import { translateText, translateImage, translateVoice } from "./gemini.js";
 import { formatContacts, formatAreas } from "./data.js";
+import { checkAndIncrement, dailyLimit } from "./rateLimit.js";
 
 export function createBot(): Bot {
   const bot = new Bot(config.telegramBotToken);
@@ -28,11 +29,19 @@ export function createBot(): Bot {
 
   bot.on("message:text", async (ctx) => {
     if (ctx.message.text.startsWith("/")) return;
+    if (!checkAndIncrement(String(ctx.chat.id))) {
+      await ctx.reply(`Daily limit of ${dailyLimit} translations reached. Try again tomorrow.`);
+      return;
+    }
     const reply = await translateText(ctx.message.text);
     await ctx.reply(reply);
   });
 
   bot.on("message:photo", async (ctx) => {
+    if (!checkAndIncrement(String(ctx.chat.id))) {
+      await ctx.reply(`Daily limit of ${dailyLimit} translations reached. Try again tomorrow.`);
+      return;
+    }
     const photo = ctx.message.photo.at(-1)!;
     const file = await ctx.api.getFile(photo.file_id);
     const bytes = await downloadFile(file.file_path!);
@@ -41,6 +50,10 @@ export function createBot(): Bot {
   });
 
   bot.on("message:voice", async (ctx) => {
+    if (!checkAndIncrement(String(ctx.chat.id))) {
+      await ctx.reply(`Daily limit of ${dailyLimit} translations reached. Try again tomorrow.`);
+      return;
+    }
     const file = await ctx.api.getFile(ctx.message.voice.file_id);
     const bytes = await downloadFile(file.file_path!);
     const reply = await translateVoice(bytes, "audio/ogg");
