@@ -1,4 +1,5 @@
 import express from "express";
+import cors from "cors";
 import { config } from "./config.js";
 import { translateText, translateImage, translateVoice } from "./gemini.js";
 import { getContacts, getAreas } from "./data.js";
@@ -6,6 +7,7 @@ import { requirePassphrase } from "./auth.js";
 
 export function createServer() {
   const app = express();
+  app.use(cors());
   app.use(express.json({ limit: "15mb" }));
 
   app.post("/api/auth/check", requirePassphrase, (_req, res) => {

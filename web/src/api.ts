@@ -1,4 +1,5 @@
 const PASSPHRASE_KEY = "db_passphrase";
+const API_BASE = import.meta.env.VITE_API_BASE ?? "";
 
 export function getPassphrase(): string | null {
   return localStorage.getItem(PASSPHRASE_KEY);
@@ -9,7 +10,7 @@ export function setPassphrase(value: string) {
 }
 
 async function call(path: string, body?: unknown) {
-  const res = await fetch(path, {
+  const res = await fetch(API_BASE + path, {
     method: body === undefined ? "GET" : "POST",
     headers: {
       "Content-Type": "application/json",
