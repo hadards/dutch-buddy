@@ -46,7 +46,7 @@ A family tool for settling into the Netherlands: translation between English, He
 
 | File | Responsibility |
 |---|---|
-| `src/gemini.ts` | The only place Gemini is called. Exports `translateText`, `translateImage`, `translateVoice`. One shared instruction string tells the model to translate among EN/NL/HE and add a plain-language note for bureaucratic Dutch mail. |
+| `src/gemini.ts` | The only place Gemini is called. Exports `translateText`, `translateImage`, `translateVoice`. One shared instruction string tells the model to translate among EN/NL/HE and add a plain-language note for bureaucratic Dutch mail. Gemini retries 3x with backoff on a 503 (transient overload); if `GROQ_API_KEY` is set, `translateText`/`translateImage` fall back to Groq's free API after Gemini's retries are exhausted. `translateVoice` has no fallback — Groq's free tier doesn't do audio transcription. |
 | `src/bot.ts` | Telegram bot (grammy). Routes text/photo/voice messages to `gemini.ts`, `/numbers` and `/areas` commands to `data.ts`. Chat-ID allowlist runs as middleware before any handler. Has a `bot.catch()` handler so one failed request (e.g. a Gemini error) can't crash the whole process. |
 | `src/server.ts` | Express API for the web app — same three Gemini functions, same data reads, behind passphrase auth. |
 | `src/auth.ts` | `requirePassphrase` middleware — checks the `x-passphrase` header against `WEB_PASSPHRASE`. |
@@ -64,6 +64,8 @@ A family tool for settling into the Netherlands: translation between English, He
 | `ALLOWED_CHAT_IDS` | Comma-separated Telegram chat IDs allowed to use the bot. **This is the sender's personal chat ID, not the bot's own ID** — easy to mix up since both look like similar numbers (see Debugging Notes). |
 | `WEB_PASSPHRASE` | Shared passphrase gating the web app. |
 | `PORT` | API server port (default 3000). |
+| `GROQ_API_KEY` | Optional. From [console.groq.com](https://console.groq.com), no card required. If unset, the app runs Gemini-only with no fallback — this is the default, not an error. |
+| `GROQ_MODEL` | Which Groq model to use as fallback (default `qwen/qwen3.6-27b` — handles both text and vision in one model). |
 
 ## Web app (`web/`)
 

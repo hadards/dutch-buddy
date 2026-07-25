@@ -16,4 +16,6 @@ export const config = {
   webPassphrase: required("WEB_PASSPHRASE"),
   port: Number(process.env.PORT ?? 3000),
   geminiModel: process.env.GEMINI_MODEL ?? "gemini-2.0-flash",
+  groqApiKey: process.env.GROQ_API_KEY,
+  groqModel: process.env.GROQ_MODEL ?? "qwen/qwen3.6-27b",
 };
