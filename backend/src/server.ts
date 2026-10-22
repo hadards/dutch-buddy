@@ -12,7 +12,8 @@ import { checkAndIncrement, dailyLimit } from "./rateLimit.js";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 function requireRateLimit(req: express.Request, res: express.Response, next: express.NextFunction) {
-  if (!checkAndIncrement("web")) {
+  const clientId = String(req.headers["x-forwarded-for"] || req.ip || "web");
+  if (!checkAndIncrement(clientId)) {
     res.status(429).json({ error: `Daily limit of ${dailyLimit} translations reached. Try again tomorrow.` });
     return;
   }

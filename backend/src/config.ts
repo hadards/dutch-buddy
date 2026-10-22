@@ -5,7 +5,7 @@ export const config = {
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
   allowedChatIds: (process.env.ALLOWED_CHAT_IDS ?? "")
     .split(",")
-    .map((id) => id.trim())
+    .map((id) => id.trim().replace(/^['"]|['"]$/g, ""))
     .filter(Boolean),
   webPassphrase: process.env.WEB_PASSPHRASE ?? "dutchbuddy",
   port: Number(process.env.PORT ?? 3000),

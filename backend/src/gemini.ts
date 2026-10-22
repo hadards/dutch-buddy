@@ -7,7 +7,14 @@ function getGenAI(): GoogleGenAI {
   if (!apiKey) {
     throw new Error("GEMINI_API_KEY is not configured. Please set GEMINI_API_KEY in your environment.");
   }
-  return new GoogleGenAI({ apiKey });
+  return new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      headers: {
+        "User-Agent": "aistudio-build",
+      },
+    },
+  });
 }
 
 function getGroqClient(): OpenAI | null {
@@ -17,8 +24,29 @@ function getGroqClient(): OpenAI | null {
   return null;
 }
 
-// ponytail: fixed backoff schedule covers Gemini's transient 503 overload spikes; add jitter if this still isn't enough
-const RETRY_DELAYS_MS = [2000, 5000, 10000];
+function isRetryable(err: unknown): boolean {
+  const msg = String((err as Error)?.message || "");
+  const status =
+    (err as { status?: number; statusCode?: number })?.status ||
+    (err as { status?: number; statusCode?: number })?.statusCode;
+  return (
+    status === 503 ||
+    status === 429 ||
+    status === 500 ||
+    msg.includes("503") ||
+    msg.includes("429") ||
+    msg.includes("500") ||
+    msg.includes("RESOURCE_EXHAUSTED") ||
+    msg.includes("rate limit") ||
+    msg.includes("overloaded") ||
+    msg.includes("Quota exceeded") ||
+    msg.includes("temporarily unavailable") ||
+    msg.includes("ECONNRESET") ||
+    msg.includes("ETIMEDOUT")
+  );
+}
+
+const RETRY_DELAYS_MS = [2000, 4000, 8000];
 
 async function generateWithRetry(params: {
   model: string;
@@ -28,16 +56,23 @@ async function generateWithRetry(params: {
   }>;
 }) {
   const ai = getGenAI();
-  for (const delay of RETRY_DELAYS_MS) {
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
     try {
       return await ai.models.generateContent(params);
     } catch (err) {
-      const status = (err as { status?: number }).status;
-      if (status !== 503) throw err;
-      await new Promise((r) => setTimeout(r, delay));
+      lastError = err;
+      const isLastAttempt = attempt === RETRY_DELAYS_MS.length;
+      if (!isLastAttempt && isRetryable(err)) {
+        const delay = RETRY_DELAYS_MS[attempt];
+        console.warn(`[Gemini] Retrying in ${delay}ms due to: ${(err as Error).message?.slice(0, 100)}`);
+        await new Promise((r) => setTimeout(r, delay));
+        continue;
+      }
+      throw err;
     }
   }
-  return ai.models.generateContent(params);
+  throw lastError;
 }
 
 const TRANSLATE_INSTRUCTIONS =
@@ -45,7 +80,6 @@ const TRANSLATE_INSTRUCTIONS =
   "Detect the source language. Reply with the translation into the other relevant languages (always include Dutch, English, and Hebrew unless the source is already one of them, in which case translate to the remaining two). " +
   "Keep it short and clearly labeled per language. If the text looks like official/bureaucratic Dutch mail (gemeente, belastingdienst, DigiD, etc.), add a one- or two-sentence plain-language explanation of what it means and whether action is needed.";
 
-// ponytail: single fallback attempt, no retry of its own — Gemini already retried 3x, Groq just needs to be available once
 async function translateTextViaGroq(text: string): Promise<string> {
   const groq = getGroqClient();
   if (!groq) throw new Error("Groq fallback client is not configured");
@@ -83,6 +117,7 @@ export async function translateText(text: string): Promise<string> {
     return response.text ?? "(no response)";
   } catch (err) {
     if (!config.groqApiKey) throw err;
+    console.warn("[Gemini] Falling back to Groq for text translation...");
     return translateTextViaGroq(text);
   }
 }
@@ -109,12 +144,18 @@ async function translateMedia(
     return response.text ?? "(no response)";
   } catch (err) {
     if (!config.groqApiKey || !fallbackToGroq) throw err;
+    console.warn("[Gemini] Falling back to Groq for image translation...");
     return translateImageViaGroq(bytes, mimeType, instruction);
   }
 }
 
-export function translateImage(imageBytes: Buffer, mimeType: string): Promise<string> {
-  return translateMedia(imageBytes, mimeType, "Extract any text visible in this image first, then translate it.", true);
+export function translateImage(imageBytes: Buffer, mimeType: string, instruction?: string): Promise<string> {
+  return translateMedia(
+    imageBytes,
+    mimeType,
+    instruction || "Extract any text visible in this image first, then translate it.",
+    true
+  );
 }
 
 export function translateVoice(audioBytes: Buffer, mimeType: string): Promise<string> {
