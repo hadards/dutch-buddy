@@ -1,5 +1,15 @@
 const PASSPHRASE_KEY = "db_passphrase";
-const API_BASE = import.meta.env.VITE_API_BASE ?? "";
+
+const isHostedLocallyOrInPreview =
+  typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1" ||
+    window.location.hostname.endsWith(".run.app") ||
+    window.location.hostname.includes("google.com"));
+
+const API_BASE = isHostedLocallyOrInPreview
+  ? ""
+  : (import.meta.env.VITE_API_BASE ?? "");
 
 export function getPassphrase(): string | null {
   return localStorage.getItem(PASSPHRASE_KEY);

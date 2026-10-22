@@ -2,17 +2,32 @@ import { GoogleGenAI } from "@google/genai";
 import OpenAI from "openai";
 import { config } from "./config.js";
 
-const ai = new GoogleGenAI({ apiKey: config.geminiApiKey });
-const MODEL = config.geminiModel;
+function getGenAI(): GoogleGenAI {
+  const apiKey = config.geminiApiKey || process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error("GEMINI_API_KEY is not configured. Please set GEMINI_API_KEY in your environment.");
+  }
+  return new GoogleGenAI({ apiKey });
+}
 
-const groq = config.groqApiKey
-  ? new OpenAI({ apiKey: config.groqApiKey, baseURL: "https://api.groq.com/openai/v1" })
-  : null;
+function getGroqClient(): OpenAI | null {
+  if (config.groqApiKey) {
+    return new OpenAI({ apiKey: config.groqApiKey, baseURL: "https://api.groq.com/openai/v1" });
+  }
+  return null;
+}
 
 // ponytail: fixed backoff schedule covers Gemini's transient 503 overload spikes; add jitter if this still isn't enough
 const RETRY_DELAYS_MS = [2000, 5000, 10000];
 
-async function generateWithRetry(params: Parameters<typeof ai.models.generateContent>[0]) {
+async function generateWithRetry(params: {
+  model: string;
+  contents: Array<{
+    role?: string;
+    parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }>;
+  }>;
+}) {
+  const ai = getGenAI();
   for (const delay of RETRY_DELAYS_MS) {
     try {
       return await ai.models.generateContent(params);
@@ -32,7 +47,9 @@ const TRANSLATE_INSTRUCTIONS =
 
 // ponytail: single fallback attempt, no retry of its own — Gemini already retried 3x, Groq just needs to be available once
 async function translateTextViaGroq(text: string): Promise<string> {
-  const completion = await groq!.chat.completions.create({
+  const groq = getGroqClient();
+  if (!groq) throw new Error("Groq fallback client is not configured");
+  const completion = await groq.chat.completions.create({
     model: config.groqModel,
     messages: [{ role: "user", content: `${TRANSLATE_INSTRUCTIONS}\n\nText:\n${text}` }],
   });
@@ -40,7 +57,9 @@ async function translateTextViaGroq(text: string): Promise<string> {
 }
 
 async function translateImageViaGroq(imageBytes: Buffer, mimeType: string, instruction: string): Promise<string> {
-  const completion = await groq!.chat.completions.create({
+  const groq = getGroqClient();
+  if (!groq) throw new Error("Groq fallback client is not configured");
+  const completion = await groq.chat.completions.create({
     model: config.groqModel,
     messages: [
       {
@@ -58,12 +77,12 @@ async function translateImageViaGroq(imageBytes: Buffer, mimeType: string, instr
 export async function translateText(text: string): Promise<string> {
   try {
     const response = await generateWithRetry({
-      model: MODEL,
+      model: config.geminiModel,
       contents: [{ role: "user", parts: [{ text: `${TRANSLATE_INSTRUCTIONS}\n\nText:\n${text}` }] }],
     });
     return response.text ?? "(no response)";
   } catch (err) {
-    if (!groq) throw err;
+    if (!config.groqApiKey) throw err;
     return translateTextViaGroq(text);
   }
 }
@@ -76,7 +95,7 @@ async function translateMedia(
 ): Promise<string> {
   try {
     const response = await generateWithRetry({
-      model: MODEL,
+      model: config.geminiModel,
       contents: [
         {
           role: "user",
@@ -89,7 +108,7 @@ async function translateMedia(
     });
     return response.text ?? "(no response)";
   } catch (err) {
-    if (!groq || !fallbackToGroq) throw err;
+    if (!config.groqApiKey || !fallbackToGroq) throw err;
     return translateImageViaGroq(bytes, mimeType, instruction);
   }
 }

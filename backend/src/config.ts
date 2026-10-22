@@ -1,21 +1,15 @@
 import "dotenv/config";
 
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing required env var: ${name}`);
-  return value;
-}
-
 export const config = {
-  geminiApiKey: required("GEMINI_API_KEY"),
-  telegramBotToken: required("TELEGRAM_BOT_TOKEN"),
-  allowedChatIds: required("ALLOWED_CHAT_IDS")
+  geminiApiKey: process.env.GEMINI_API_KEY ?? "",
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
+  allowedChatIds: (process.env.ALLOWED_CHAT_IDS ?? "")
     .split(",")
     .map((id) => id.trim())
     .filter(Boolean),
-  webPassphrase: required("WEB_PASSPHRASE"),
+  webPassphrase: process.env.WEB_PASSPHRASE ?? "dutchbuddy",
   port: Number(process.env.PORT ?? 3000),
-  geminiModel: process.env.GEMINI_MODEL ?? "gemini-2.0-flash",
+  geminiModel: process.env.GEMINI_MODEL ?? "gemini-2.5-flash",
   groqApiKey: process.env.GROQ_API_KEY,
   groqModel: process.env.GROQ_MODEL ?? "qwen/qwen3.6-27b",
 };

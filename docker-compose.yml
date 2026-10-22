@@ -1,0 +1,30 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dutch-buddy
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    volumes:
+      # Allows live updates to contacts and areas without rebuilding image
+      - ./backend/src/data:/app/backend/dist/data
+
+  # Optional containerized ngrok tunnel:
+  # Enable with: docker compose --profile ngrok up -d
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: dutch-buddy-ngrok
+    restart: unless-stopped
+    profiles:
+      - ngrok
+    command: http app:3000
+    environment:
+      NGROK_AUTHTOKEN: ${NGROK_AUTHTOKEN:-}
+    ports:
+      - "4040:4040"
+    depends_on:
+      - app
